@@ -1,0 +1,9 @@
+// Invalid PCC program - redefined variable
+VAR name = "Alice";
+VAR name = "Bob";  // Error: name already defined
+
+PROMPT greeting {
+    "Hello, $name!"
+}
+
+OUTPUT greeting AS JSON;

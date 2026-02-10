@@ -1,0 +1,15 @@
+// Valid PCC program with conditionals
+VAR debugMode = true;
+VAR systemName = "PCC";
+
+PROMPT mainPrompt {
+    "You are $systemName.\n"
+    IF debugMode {
+        "DEBUG: Enabled\n"
+        "Verbose logging is active."
+    } ELSE {
+        "Production mode active."
+    }
+}
+
+OUTPUT mainPrompt AS TEXT;

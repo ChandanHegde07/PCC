@@ -1,0 +1,21 @@
+// Valid PCC program with templates
+VAR systemName = "PCC";
+
+TEMPLATE formatSection(title, content) {
+    "## $title\n$content"
+}
+
+TEMPLATE formatUser(name, role) {
+    "User: $name (Role: $role)"
+}
+
+PROMPT mainPrompt {
+    "You are $systemName, a prompt compiler.\n"
+    @formatSection("Task", "Convert DSL to optimized prompts")
+    "Users: "
+    FOR user IN users {
+        @formatUser(user.name, user.role)
+    }
+}
+
+OUTPUT mainPrompt AS JSON;

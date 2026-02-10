@@ -1,0 +1,9 @@
+// Simple valid PCC program
+VAR systemName = "PCC";
+VAR maxTokens = 1000;
+
+PROMPT greeting {
+    "Hello, $name! Welcome to $systemName."
+}
+
+OUTPUT greeting AS JSON;
