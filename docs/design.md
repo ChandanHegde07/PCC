@@ -41,23 +41,23 @@ graph TD
 ```mermaid
 graph LR
     subgraph Main Application
-        A[main.c<br/>Example Usage]
+        A[main.c - Example Usage]
     end
     
     subgraph Core Library
-        B[context_window.c<br/>Implementation]
-        C[context_window.h<br/>API Definition]
+        B[context_window.c - Implementation]
+        C[context_window.h - API Definition]
     end
     
     subgraph Data Structures
-        D[Message<br/>(Doubly Linked List)]
-        E[ContextWindow<br/>(Manager)]
+        D[Message - Doubly Linked List]
+        E[ContextWindow - Manager]
     end
     
     subgraph Algorithms
-        F[Token Estimation<br/>Heuristic]
-        G[Compression<br/>Algorithm]
-        H[Context Generation<br/>Formatter]
+        F[Token Estimation - Heuristic]
+        G[Compression - Algorithm]
+        H[Context Generation - Formatter]
     end
     
     subgraph Utilities
