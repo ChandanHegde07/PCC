@@ -1,96 +1,74 @@
-# PCC Compiler Makefile
+# LLM Context Window Manager - Makefile
 
 # Compiler and flags
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c99 -I./include
-LDFLAGS = -lm
-DEBUG_FLAGS = -g -O0 -DPCC_DEBUG
-RELEASE_FLAGS = -O2
-
-# Directories
-SRC_DIR = src
-INCLUDE_DIR = include
-BUILD_DIR = build
-TEST_DIR = tests
-EXAMPLES_DIR = examples
-OUTPUTS_DIR = outputs
-
-# Source files
-SRCS = $(wildcard $(SRC_DIR)/*.c)
-OBJS = $(SRCS:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
-
-# Test files
-TEST_SRCS = $(wildcard $(TEST_DIR)/*.c)
-TEST_OBJS = $(TEST_SRCS:$(TEST_DIR)/%.c=$(BUILD_DIR)/tests/%.o)
+CFLAGS = -Wall -Wextra -Iinclude -g
+LDFLAGS =
 
 # Targets
-TARGET = $(BUILD_DIR)/pcc
-TEST_TARGET = $(BUILD_DIR)/test_runner
+TARGET = llm-context-manager
+TEST_TARGET = test-window-manager
+
+# Source files
+SRC_DIR = src
+INC_DIR = include
+TEST_DIR = tests
+EXAMPLES_DIR = examples
+DOCS_DIR = docs
+
+MAIN_SRC = $(SRC_DIR)/main.c
+WINDOW_SRC = $(SRC_DIR)/context_window.c
+TEST_SRC = $(TEST_DIR)/test_window_manager.c
+
+# Object files
+MAIN_OBJ = $(MAIN_SRC:.c=.o)
+WINDOW_OBJ = $(WINDOW_SRC:.c=.o)
+TEST_OBJ = $(TEST_SRC:.c=.o)
 
 # Default target
-all: $(TARGET)
+all: $(TARGET) $(TEST_TARGET)
 
-# Create build directories
-$(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
-	mkdir -p $(BUILD_DIR)/tests
+# Build the main application
+$(TARGET): $(MAIN_OBJ) $(WINDOW_OBJ)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-# Compile source files
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(RELEASE_FLAGS) -c $< -o $@
+# Build the test suite
+$(TEST_TARGET): $(TEST_OBJ) $(WINDOW_OBJ)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
-# Compile test files
-$(BUILD_DIR)/tests/%.o: $(TEST_DIR)/%.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) $(RELEASE_FLAGS) -c $< -o $@
+# Compile source files to object files
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
-# Link main executable
-$(TARGET): $(OBJS) | $(BUILD_DIR)
-	$(CC) $(OBJS) -o $@ $(LDFLAGS)
-
-# Link test executable
-$(TEST_TARGET): $(filter-out $(BUILD_DIR)/main.o,$(OBJS)) $(TEST_OBJS) | $(BUILD_DIR)
-	$(CC) $^ -o $@ $(LDFLAGS)
-
-# Debug build
-debug: CFLAGS += $(DEBUG_FLAGS)
-debug: clean $(TARGET)
-
-# Run tests
+# Run the test suite
 test: $(TEST_TARGET)
-	./$(TEST_TARGET)
+	@echo "Running test suite..."
+	@./$(TEST_TARGET)
 
-# Run compiler on example
-run-example: $(TARGET)
-	./$(TARGET) $(EXAMPLES_DIR)/valid_simple.pcc $(OUTPUTS_DIR)/output.json
+# Run the example program
+run: $(TARGET)
+	@echo "Running example program..."
+	@./$(TARGET)
 
-# Clean build artifacts
+# Clean up compiled files
 clean:
-	rm -rf $(BUILD_DIR)
-	rm -f $(OUTPUTS_DIR)/*.json
-	rm -f $(OUTPUTS_DIR)/*.txt
-	rm -f $(OUTPUTS_DIR)/*.md
+	@rm -f $(MAIN_OBJ) $(WINDOW_OBJ) $(TEST_OBJ)
+	@rm -f $(TARGET) $(TEST_TARGET)
+	@rm -f *.out
 
-# Install
-install: $(TARGET)
-	install -d $(PREFIX)/bin
-	install -m 755 $(TARGET) $(PREFIX)/bin/pcc
+# Clean all temporary files and executables
+distclean: clean
+	@rm -rf $(TARGET) $(TEST_TARGET)
+	@rm -rf *.dSYM  # For macOS debugging
 
-# Uninstall
-uninstall:
-	rm -f $(PREFIX)/bin/pcc
+# Show project structure
+tree:
+	@echo "Project Structure:"
+	@tree -L 2 -I '*.o|*.dSYM' .
 
-# Help
-help:
-	@echo "PCC Compiler Makefile"
-	@echo "====================="
-	@echo "Targets:"
-	@echo "  all         - Build the compiler (default)"
-	@echo "  debug       - Build with debug symbols"
-	@echo "  test        - Build and run tests"
-	@echo "  run-example - Run compiler on example file"
-	@echo "  clean       - Remove build artifacts"
-	@echo "  install     - Install to PREFIX (default: /usr/local)"
-	@echo "  uninstall   - Remove from PREFIX"
-	@echo "  help        - Show this help message"
+.PHONY: all clean distclean test run tree
 
-.PHONY: all debug test run-example clean install uninstall help
+# Dependencies
+$(MAIN_OBJ): $(INC_DIR)/context_window.h
+$(WINDOW_OBJ): $(INC_DIR)/context_window.h
+$(TEST_OBJ): $(INC_DIR)/context_window.h

@@ -1,282 +1,146 @@
-# PCC Compiler Architecture
+# LLM Context Window Manager - Architecture
 
 ## Overview
 
-PCC (Prompt Compiler Compiler) is a lightweight compiler written in C that converts a domain-specific language (DSL) into structured and optimized prompts for Large Language Model (LLM) systems.
+The LLM Context Window Manager is a C-based system designed to efficiently manage conversation history within the limited context window constraints of modern Large Language Models (LLMs). It implements intelligent message retention and compression strategies to ensure that the most important information remains within the context window while staying under token limits.
 
-## Compiler Pipeline
+## Problem Statement
 
-The PCC compiler follows a traditional multi-phase compiler architecture:
+LLMs like GPT-3/4, Claude, and Llama have fixed context window sizes that limit the amount of conversation history they can process in a single request. This creates several challenges:
 
-```
-Source Code (.pcc)
-       |
-       v
-+--------------+
-|   Lexer      |  Tokenization
-+--------------+
-       |
-       v
-+--------------+
-|   Parser     |  AST Construction
-+--------------+
-       |
-       v
-+--------------+
-|  Semantic    |  Type Checking & Scope Validation
-|  Analyzer    |
-+--------------+
-       |
-       v
-+--------------+
-|  Optimizer   |  Constant Folding, Dead Code Elimination
-+--------------+
-       |
-       v
-+--------------+
-| Code Gen     |  JSON/Text/Markdown Output
-+--------------+
-       |
-       v
-  Output File
+1. **Token Limit Exceedance**: Conversations longer than the token limit are rejected
+2. **Information Loss**: Truncating conversations arbitrarily can lose important context
+3. **Inefficient Context Management**: Manual management of conversation history is time-consuming and error-prone
+4. **Priority Handling**: Not all messages are equally important; some contain critical information
+
+## Solution Architecture
+
+The system is designed around three core architectural principles:
+
+### 1. Data Structures
+
+#### Linked List Implementation
+- Doubly linked list for efficient message management
+- Each node represents a conversation message with metadata
+- Allows O(1) insertion at both ends and O(n) traversal
+
+```c
+typedef struct Message {
+    MessageType type;              // Type of message
+    MessagePriority priority;      // Importance level
+    char* content;                 // Message content
+    int token_count;               // Token estimation
+    struct Message* next;          // Next node pointer
+    struct Message* prev;          // Previous node pointer
+} Message;
 ```
 
-## Components
+#### Context Window Structure
+```c
+typedef struct ContextWindow {
+    Message* head;                 // Head of the message queue
+    Message* tail;                 // Tail of the message queue
+    int total_tokens;              // Total tokens in window
+    int max_tokens;                // Token limit
+    int message_count;             // Number of messages
+} ContextWindow;
+```
 
-### 1. Lexical Analyzer (Lexer)
+### 2. Core Algorithms
 
-**File:** [`src/lexer.c`](../src/lexer.c), [`include/lexer.h`](../include/lexer.h)
+#### Sliding Window Technique
+- Maintains a contiguous window of messages within the token limit
+- New messages are added to the end (tail) of the window
+- Old messages are removed from the beginning (head) when limits are exceeded
 
-The lexer converts the source code into a stream of tokens. It uses a finite automaton approach for pattern matching.
+#### Priority-Based Message Retention
+- Messages are assigned priority levels: PRIORITY_LOW, PRIORITY_NORMAL, PRIORITY_HIGH, PRIORITY_CRITICAL
+- When compression is needed, lower priority messages are removed first
+- Critical messages are retained as long as possible
 
-**Key Features:**
-- Keyword recognition
-- String, number, and boolean literal parsing
-- Operator and punctuation tokenization
-- Comment handling (single-line `//` and multi-line `/* */`)
-- Line and column tracking for error reporting
+#### Token Estimation
+- Simple heuristic: 1 token ≈ 4 characters (worst-case estimation)
+- Allows quick calculation of token counts without complex NLP libraries
+- Estimation formula: `token_count = (str_length + 3) / 4`
 
-**DSA Concept:** Finite automaton for pattern matching
+### 3. System Components
 
-### 2. Parser
+#### Message Management
+- `context_window_add_message()` - Adds new messages with type and priority
+- `remove_message()` - Removes specific messages from the linked list
+- `context_window_get_context()` - Generates formatted context string for LLM API
 
-**File:** [`src/parser.c`](../src/parser.c), [`include/parser.h`](../include/parser.h)
+#### Compression Strategy
+1. First, remove all PRIORITY_LOW messages
+2. If still over limit, remove PRIORITY_NORMAL messages
+3. If still over limit, remove PRIORITY_HIGH messages
+4. As a last resort, remove PRIORITY_CRITICAL messages (should rarely happen)
 
-The parser uses recursive descent parsing to construct an Abstract Syntax Tree (AST) from the token stream.
+#### Statistics and Monitoring
+- `context_window_get_token_count()` - Returns current token usage
+- `context_window_get_message_count()` - Returns number of messages
+- `context_window_print_stats()` - Prints comprehensive window statistics
 
-**Key Features:**
-- Recursive descent parsing
-- AST node creation for all language constructs
-- Error recovery and reporting
-- Precedence and associativity handling
+## Design Patterns
 
-**DSA Concept:** Recursive descent parsing (tree construction)
+### 1. Queue Pattern
+- FIFO (First-In-First-Out) behavior for normal message handling
+- Supports sliding window operations
 
-### 3. Abstract Syntax Tree (AST)
+### 2. Priority Queue Pattern
+- Messages are retained based on priority level
+- Lower priority messages are discarded first
 
-**File:** [`src/ast.c`](../src/ast.c), [`include/ast.h`](../include/ast.h)
+### 3. Iterator Pattern
+- Linked list traversal for message processing
+- Allows for flexible message compression algorithms
 
-The AST represents the syntactic structure of the program in a hierarchical tree format.
-
-**Node Types:**
-- `AST_PROGRAM` - Root node
-- `AST_PROMPT_DEF` - Prompt definition
-- `AST_VAR_DECL` - Variable declaration
-- `AST_TEMPLATE_DEF` - Template definition
-- `AST_CONSTRAINT_DEF` - Constraint definition
-- `AST_OUTPUT_SPEC` - Output specification
-- `AST_IF_STMT`, `AST_FOR_STMT`, `AST_WHILE_STMT` - Control flow
-- `AST_BINARY_EXPR`, `AST_UNARY_EXPR` - Expressions
-- `AST_TEXT_ELEMENT`, `AST_VARIABLE_REF` - Prompt elements
-
-**DSA Concept:** Tree data structure
-
-### 4. Symbol Table
-
-**File:** [`src/symbol_table.c`](../src/symbol_table.c), [`include/symbol_table.h`](../include/symbol_table.h)
-
-The symbol table tracks all defined symbols (variables, templates, prompts, constraints) with scope management.
-
-**Key Features:**
-- Hierarchical scope management
-- Symbol type tracking
-- Definition and usage tracking
-- Hash table implementation for O(1) lookups
-
-**DSA Concept:** Hash table with scope management
-
-### 5. Semantic Analyzer
-
-**File:** [`src/semantic.c`](../src/semantic.c), [`include/semantic.h`](../include/semantic.h)
-
-The semantic analyzer performs type checking, scope validation, and other semantic checks on the AST.
-
-**Key Features:**
-- Symbol definition validation
-- Undefined symbol detection
-- Type checking
-- Scope validation
-
-**DSA Concept:** Tree traversal (AST visitor pattern)
-
-### 6. Optimizer
-
-**File:** [`src/optimizer.c`](../src/optimizer.c), [`include/optimizer.h`](../include/optimizer.h)
-
-The optimizer performs various transformations on the AST to improve efficiency.
-
-**Optimization Passes:**
-- **Constant Folding:** Evaluates constant expressions at compile time
-- **Dead Code Elimination:** Removes unreachable code (e.g., always-true/false conditions)
-- **Unused Removal:** Removes unused variables (planned)
-- **Template Inlining:** Inlines simple templates (planned)
-
-**DSA Concept:** Tree transformation and pattern matching
-
-### 7. Code Generator
-
-**File:** [`src/codegen.c`](../src/codegen.c), [`include/codegen.h`](../include/codegen.h)
-
-The code generator converts the optimized AST into the desired output format.
-
-**Output Formats:**
-- **JSON:** Structured representation of the prompt
-- **TEXT:** Plain text output
-- **MARKDOWN:** Formatted markdown output
-
-**DSA Concept:** Tree traversal for code generation
-
-## Data Structures
-
-### Dynamic Array
-
-**File:** [`src/array.c`](../src/array.c), [`include/array.h`](../include/array.h)
-
-A generic dynamic array implementation with automatic resizing.
-
-**Operations:**
-- `push`, `pop`, `get`, `set`
-- `insert`, `remove`
-- `find`, `contains`
-- `sort`, `reverse`
-
-**Time Complexity:**
-- Access: O(1)
-- Insert/Delete at end: O(1) amortized
-- Insert/Delete at index: O(n)
-- Search: O(n)
-
-### Tree
-
-**File:** [`src/tree.c`](../src/tree.c), [`include/tree.h`](../include/tree.h)
-
-A generic tree structure used for AST representation.
-
-**Operations:**
-- `add_child`, `remove_child`
-- `get_child`, `child_count`
-- `find_by_type`, `find_all_by_type`
-- `traverse` (pre-order, post-order, level-order)
-- `depth`, `height`
-
-**Time Complexity:**
-- Access: O(1) with reference
-- Traversal: O(n)
-- Search: O(n)
-
-### Hash Table
-
-**File:** [`src/hashtable.c`](../src/hashtable.c), [`include/hashtable.h`](../include/hashtable.h)
-
-A hash table with separate chaining for collision resolution.
-
-**Operations:**
-- `put`, `get`, `remove`
-- `contains`, `clear`
-- `resize`, `get_keys`, `get_values`
-
-**Time Complexity:**
-- Average case: O(1)
-- Worst case: O(n)
+### 4. Factory Pattern (Message Creation)
+- `create_message()` function encapsulates message construction
+- Handles memory allocation and initialization
 
 ## Memory Management
 
-PCC uses explicit memory management with `malloc` and `free`:
+- All messages are dynamically allocated and properly freed
+- `context_window_destroy()` cleans up all resources
+- Each message's content is duplicated using `strdup()` for safety
+- Error handling for memory allocation failures
 
-- All data structures are dynamically allocated
-- Each component provides cleanup functions
-- Memory is freed in reverse order of allocation
-- No garbage collection - manual memory management required
+## Performance Characteristics
 
-## Error Handling
+- **Time Complexity**:
+  - Adding a message: O(n) in worst case (due to compression), O(1) amortized
+  - Removing a message: O(1)
+  - Calculating context string: O(n)
+- **Space Complexity**: O(n) where n is the number of messages
+- **Compression Speed**: Fast heuristic-based compression ensures low latency
 
-The compiler uses a comprehensive error reporting system:
+## Extensibility
 
-1. **Lexical Errors:** Invalid characters, unterminated strings
-2. **Syntax Errors:** Unexpected tokens, missing delimiters
-3. **Semantic Errors:** Undefined symbols, type mismatches
-4. **Runtime Errors:** Memory allocation failures
+The architecture is designed to be easily extensible:
 
-Each error includes:
-- Error message
-- Source position (line, column, filename)
-- Error code
-
-## Build System
-
-**File:** [`Makefile`](../Makefile)
-
-The Makefile provides targets for:
-- Building the compiler (`make`)
-- Debug builds (`make debug`)
-- Running tests (`make test`)
-- Running examples (`make run-example`)
-- Installation (`make install`)
-
-## Testing
-
-**Directory:** [`tests/`](../tests/)
-
-Unit tests are provided for each component:
-- `test_array.c` - Array data structure tests
-- `test_runner.c` - Main test runner
-
-## Examples
-
-**Directory:** [`examples/`](../examples/)
-
-Example programs demonstrating:
-- `valid_simple.pcc` - Simple valid program
-- `valid_template.pcc` - Template usage
-- `valid_conditional.pcc` - Conditional statements
-- `invalid_undefined_var.pcc` - Undefined variable error
-- `invalid_syntax.pcc` - Syntax error
-- `invalid_redefined.pcc` - Redefinition error
-
-## Usage
-
-```bash
-# Build the compiler
-make
-
-# Compile a PCC file
-./build/pcc input.pcc output.json
-
-# Compile with optimizations
-./build/pcc -O input.pcc output.json
-
-# Compile with text output
-./build/pcc -f text input.pcc output.txt
-
-# Run tests
-make test
-```
+1. **Token Estimation**: Can be replaced with more accurate NLP-based tokenizers
+2. **Compression Algorithms**: Priority-based strategy can be extended with ML-based approaches
+3. **Message Types**: New message types can be added by extending the MessageType enum
+4. **Priority Levels**: Additional priority levels can be added by extending MessagePriority
 
 ## Future Enhancements
 
-1. Additional optimization passes
-2. More output formats (XML, YAML)
-3. Interactive mode
-4. Linting and style checking
-5. Code completion support
-6. IDE integration
+1. **Intelligent Summarization**: Compress old messages by generating concise summaries
+2. **Topic Detection**: Group related messages and retain key topics
+3. **User Preferences**: Allow custom priority rules based on user-defined patterns
+4. **Tokenization**: Integrate with real tokenizers like Hugging Face's tokenizers
+5. **Configuration**: Support external configuration files for system parameters
+
+## System Requirements
+
+- C compiler (GCC 4.0 or later)
+- Standard C library
+- POSIX-compliant system (Linux, macOS, Windows with WSL)
+
+## Build System
+
+Simple Makefile for compiling and testing:
+- `make all` - Build library and test suite
+- `make test` - Run all tests
+- `make clean` - Remove compiled files

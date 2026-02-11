@@ -1,6 +1,0 @@
-// Invalid PCC program - undefined variable
-PROMPT greeting {
-    "Hello, $undefinedVar!"
-}
-
-OUTPUT greeting AS JSON;

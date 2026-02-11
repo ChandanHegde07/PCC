@@ -1,8 +1,0 @@
-// Invalid PCC program - syntax error
-VAR name = "Alice"
-// Missing semicolon
-VAR age = 42
-
-PROMPT greeting {
-    "Hello, $name!"
-    // Missing closing brace
