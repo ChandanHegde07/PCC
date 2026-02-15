@@ -1,17 +1,17 @@
+// Demo application for the SLM Context Window Manager.
+
 #include "context_window.h"
 
 int main() {
     printf("SLM Context Window Manager\n");
     printf("==========================\n\n");
     
-    // Create a context window with 1000 token limit
     ContextWindow* window = context_window_create(1000);
     if (window == NULL) {
         printf("Failed to create context window\n");
         return 1;
     }
     
-    // Add some example messages
     printf("Adding initial messages...\n\n");
     
     context_window_add_message(window, MESSAGE_SYSTEM, PRIORITY_CRITICAL, 
@@ -55,11 +55,9 @@ int main() {
         "\n"
         "Also, make sure to check if malloc() returns NULL to handle out-of-memory errors.");
     
-    // Print context window statistics
     context_window_print_stats(window);
     printf("\n");
     
-    // Get and print the optimized context
     printf("Optimized Context for SLM API:\n");
     printf("-------------------------------\n");
     char* context = context_window_get_context(window);
@@ -68,7 +66,6 @@ int main() {
         free(context);
     }
     
-    // Clean up
     context_window_destroy(window);
     
     printf("\n==========================\n");
