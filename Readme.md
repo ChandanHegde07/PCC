@@ -305,13 +305,15 @@ PCC/
 │   ├── context_window.c           # Core implementation
 │   └── main.c                     # Demo application
 ├── include/
-│   └── context_window.h           # Public API header
+│   ├── context_window.h           # Public API header
+│   └── version.h                  # Version definitions
 ├── tests/
 │   ├── test_window_manager.c      # Test suite
 │   └── benchmark.c                # Performance benchmarks
 ├── examples/
 │   ├── basic_usage.c
 │   ├── config_example.c
+│   ├── google_gemini_api_example.c
 │   ├── save_load_example.c
 │   └── sample_conversation.txt
 ├── docs/
@@ -333,3 +335,9 @@ PCC/
 5. Open a Pull Request with a clear description of what changed and why
 
 Please keep to the existing code style and build with zero warnings.
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
