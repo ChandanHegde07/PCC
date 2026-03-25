@@ -2,8 +2,8 @@
 
 ![Version](https://img.shields.io/badge/Version-1.0.0-007396?style=flat&logo=semantic-version)
 [![License: MIT](https://img.shields.io/badge/License-MIT-ff6b35?style=flat)](https://opensource.org/licenses/MIT)
-[![Language: C](https://img.shields.io/badge/Language-C-555555?style=flat&logo=c)
-[![Platform: POSIX](https://img.shields.io/badge/Platform-POSIX-2ca02c?style=flat)
+![Language: C](https://img.shields.io/badge/Language-C-555555?style=flat&logo=c)
+![Platform: POSIX](https://img.shields.io/badge/Platform-POSIX-2ca02c?style=flat)
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen?style=flat)](https://github.com/ChandanHegde07/PCC/actions)
 ![Test Coverage](https://img.shields.io/badge/Tests-23%20passed-4c1?style=flat)
 ![Last Updated](https://img.shields.io/badge/Last_Updated-Mar_2026-eeb901?style=flat)
