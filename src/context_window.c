@@ -18,6 +18,9 @@ static const char* g_log_level_strings[] = {
 static Message* create_message(MessageType type, MessagePriority priority, const char* content, int token_ratio);
 static void remove_message(ContextWindow* window, Message* msg);
 static bool compress_old_messages(ContextWindow* window);
+static bool evict_messages_by_priority(ContextWindow* window, MessagePriority priority);
+static bool summarize_old_messages(ContextWindow* window);
+static char* build_summary_content(Message* start, Message* end, int message_count);
 static const char* get_message_type_string(MessageType type);
 static const char* get_message_priority_string(MessagePriority priority);
 static void init_metrics(ContextWindow* window);
@@ -164,6 +167,166 @@ static void remove_message(ContextWindow* window, Message* msg) {
     free(msg);
 }
 
+static bool evict_messages_by_priority(ContextWindow* window, MessagePriority priority) {
+    if (window == NULL) {
+        return false;
+    }
+
+    Message* current = window->head;
+    while (current != NULL && window->total_tokens > window->max_tokens) {
+        Message* next = current->next;
+        if (current->priority == priority) {
+            remove_message(window, current);
+            if (window->metrics != NULL) {
+                window->metrics->compressions++;
+            }
+        }
+        current = next;
+    }
+
+    return window->total_tokens <= window->max_tokens;
+}
+
+static char* build_summary_content(Message* start, Message* end, int message_count) {
+    if (start == NULL || end == NULL || message_count <= 0) {
+        return NULL;
+    }
+
+    const size_t max_summary_chars = 120;
+    char* summary = (char*)calloc(max_summary_chars + 1, sizeof(char));
+    if (summary == NULL) {
+        return NULL;
+    }
+
+    size_t used = 0;
+    int written = snprintf(summary, max_summary_chars + 1,
+                           "AI Summary: Condensed %d earlier messages.",
+                           message_count);
+    if (written < 0) {
+        free(summary);
+        return NULL;
+    }
+    used = (size_t)written;
+    if (used > max_summary_chars) {
+        used = max_summary_chars;
+    }
+
+    Message* current = start;
+    if (current != NULL && used < max_summary_chars) {
+        char snippet[33];
+        size_t out = 0;
+        const char* src = current->content;
+        while (*src != '\0' && out < sizeof(snippet) - 1) {
+            char ch = *src++;
+            if (ch == '\n' || ch == '\r' || ch == '\t') {
+                ch = ' ';
+            }
+            snippet[out++] = ch;
+        }
+        snippet[out] = '\0';
+
+        (void)end;
+        (void)snprintf(summary + used,
+                       (max_summary_chars + 1) - used,
+                       " Key: %.32s",
+                       snippet);
+    }
+
+    return summary;
+}
+
+static bool summarize_old_messages(ContextWindow* window) {
+    if (window == NULL || window->total_tokens <= window->max_tokens) {
+        return false;
+    }
+
+    int overflow = window->total_tokens - window->max_tokens;
+    int target_tokens = overflow + (overflow / 2) + 1;
+
+    Message* first = window->head;
+    while (first != NULL && first->priority == PRIORITY_CRITICAL) {
+        first = first->next;
+    }
+
+    if (first == NULL) {
+        return false;
+    }
+
+    Message* last = NULL;
+    int removed_tokens = 0;
+    int summarized_count = 0;
+    Message* current = first;
+    while (current != NULL && current->priority != PRIORITY_CRITICAL) {
+        last = current;
+        removed_tokens += current->token_count;
+        summarized_count++;
+
+        if (removed_tokens >= target_tokens && summarized_count >= 2) {
+            break;
+        }
+        current = current->next;
+    }
+
+    if (last == NULL || summarized_count < 2 || removed_tokens <= 0) {
+        return false;
+    }
+
+    char* summary_content = build_summary_content(first, last, summarized_count);
+    if (summary_content == NULL) {
+        return false;
+    }
+
+    Message* summary = create_message(MESSAGE_SYSTEM,
+                                      PRIORITY_CRITICAL,
+                                      summary_content,
+                                      window->config.token_ratio);
+    free(summary_content);
+
+    if (summary == NULL) {
+        return false;
+    }
+
+    if (summary->token_count >= removed_tokens) {
+        free(summary->content);
+        free(summary);
+        return false;
+    }
+
+    Message* before = first->prev;
+    Message* after = last->next;
+
+    current = first;
+    while (current != after) {
+        Message* next = current->next;
+        remove_message(window, current);
+        current = next;
+    }
+
+    summary->prev = before;
+    summary->next = after;
+
+    if (before != NULL) {
+        before->next = summary;
+    } else {
+        window->head = summary;
+    }
+
+    if (after != NULL) {
+        after->prev = summary;
+    } else {
+        window->tail = summary;
+    }
+
+    window->message_count++;
+    window->total_tokens += summary->token_count;
+    update_metrics_on_add(window, summary->token_count);
+    if (window->metrics != NULL) {
+        window->metrics->compressions++;
+    }
+
+    return window->total_tokens <= window->max_tokens;
+}
+
 static bool compress_old_messages(ContextWindow* window) {
     if (window == NULL) {
         return false;
@@ -172,50 +335,16 @@ static bool compress_old_messages(ContextWindow* window) {
     if (window->config.compression == COMPRESSION_NONE) {
         return false;
     }
-    
-    /* Phase 1: Remove LOW priority messages */
-    Message* current = window->head;
-    while (current != NULL && window->total_tokens > window->max_tokens) {
-        Message* next = current->next;
-        if (current->priority == PRIORITY_LOW) {
-            remove_message(window, current);
-            if (window->metrics != NULL) {
-                window->metrics->compressions++;
-            }
-        }
-        current = next;
+
+    if (window->config.compression == COMPRESSION_SUMMARIZE) {
+        (void)summarize_old_messages(window);
     }
-    
-    /* Phase 2: Remove NORMAL priority if still over limit */
-    if (window->total_tokens > window->max_tokens) {
-        current = window->head;
-        while (current != NULL && window->total_tokens > window->max_tokens) {
-            Message* next = current->next;
-            if (current->priority == PRIORITY_NORMAL) {
-                remove_message(window, current);
-                if (window->metrics != NULL) {
-                    window->metrics->compressions++;
-                }
-            }
-            current = next;
-        }
-    }
-    
-    /* Phase 3: Remove HIGH priority (critical only kept) */
-    if (window->total_tokens > window->max_tokens) {
-        current = window->head;
-        while (current != NULL && window->total_tokens > window->max_tokens) {
-            Message* next = current->next;
-            if (current->priority == PRIORITY_HIGH) {
-                remove_message(window, current);
-                if (window->metrics != NULL) {
-                    window->metrics->compressions++;
-                }
-            }
-            current = next;
-        }
-    }
-    
+
+    /* Priority-based fallback (also used by aggressive strategy) */
+    (void)evict_messages_by_priority(window, PRIORITY_LOW);
+    (void)evict_messages_by_priority(window, PRIORITY_NORMAL);
+    (void)evict_messages_by_priority(window, PRIORITY_HIGH);
+
     return window->total_tokens <= window->max_tokens;
 }
 

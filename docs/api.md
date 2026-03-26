@@ -63,7 +63,7 @@ typedef enum {
 typedef enum {
     COMPRESSION_NONE = 0,     /* No compression, use eviction only */
     COMPRESSION_LOW_PRIORITY, /* Remove low priority messages first */
-    COMPRESSION_SUMMARIZE,     /* Summarize old messages (future) */
+    COMPRESSION_SUMMARIZE,     /* Summarize old messages into compact context */
     COMPRESSION_AGGRESSIVE     /* Aggressive compression */
 } CompressionStrategy;
 ```

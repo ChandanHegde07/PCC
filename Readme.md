@@ -206,6 +206,7 @@ typedef enum {
 typedef enum {
     COMPRESSION_NONE,           // No compression
     COMPRESSION_LOW_PRIORITY,   // Remove low-priority messages first
+    COMPRESSION_SUMMARIZE,      // Summarize older non-critical messages
     COMPRESSION_AGGRESSIVE      // Aggressive compression
 } CompressionStrategy;
 ```

@@ -172,6 +172,14 @@ graph TD
     L -->|No| N[Reject Message]
 ```
 
+### 5.4 Summarization Compression
+
+`COMPRESSION_SUMMARIZE` first compacts the oldest non-critical messages into a single synthetic summary message, then falls back to priority-based eviction if the window is still over limit.
+
+- Preserves `PRIORITY_CRITICAL` messages as anchors
+- Replaces multiple old messages with one short "AI Summary" system message
+- Reduces token usage while retaining conversation continuity
+
 ## 6. API Design
 
 ### 6.1 Core Functions

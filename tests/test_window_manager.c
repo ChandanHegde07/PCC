@@ -349,6 +349,87 @@ void test_sliding_window_behavior(void) {
     TEST_PASS();
 }
 
+void test_summarize_compression_creates_summary(void) {
+    TEST_START("Summarize compression creates summary");
+
+    ContextConfig config = context_config_default();
+    config.max_tokens = 300;
+    config.compression = COMPRESSION_SUMMARIZE;
+    config.auto_compress = true;
+
+    ContextWindow* window = context_window_create_with_config(&config);
+    ASSERT(window != NULL, "Window should be created with summarize strategy");
+
+    ASSERT(context_window_add_message(window, MESSAGE_SYSTEM, PRIORITY_CRITICAL,
+                                      "CRITICAL anchor instruction"),
+           "Should add critical anchor");
+
+    ASSERT(context_window_add_message(window, MESSAGE_USER, PRIORITY_NORMAL,
+                                      "User asks for detailed analytics across monthly performance and risks."),
+           "Should add user message 1");
+    ASSERT(context_window_add_message(window, MESSAGE_ASSISTANT, PRIORITY_NORMAL,
+                                      "Assistant provides an initial response with examples and caveats."),
+           "Should add assistant message 1");
+    ASSERT(context_window_add_message(window, MESSAGE_USER, PRIORITY_NORMAL,
+                                      "User follows up with constraints about budget timelines and staffing."),
+           "Should add user message 2");
+
+    ASSERT(context_window_add_message(window, MESSAGE_ASSISTANT, PRIORITY_NORMAL,
+                                      "Assistant adds a final plan and tradeoff breakdown to trigger compression."),
+           "Should add assistant message 2");
+
+    ContextConfig tighter = config;
+    tighter.max_tokens = context_window_get_token_count(window) - 15;
+    ASSERT(tighter.max_tokens > 0, "Tighter max tokens should stay positive");
+    ASSERT(context_window_apply_config(window, &tighter) == CW_SUCCESS,
+           "Applying tighter config should succeed");
+
+    ASSERT(context_window_get_token_count(window) <= tighter.max_tokens,
+           "Token count should remain within tightened limit");
+
+    char* context = context_window_get_context(window);
+    ASSERT(context != NULL, "Context should not be NULL");
+    ASSERT(strstr(context, "AI Summary: Condensed") != NULL,
+           "Context should include synthesized summary message");
+    ASSERT(strstr(context, "CRITICAL anchor instruction") != NULL,
+           "Critical anchor should remain in context");
+    free(context);
+
+    context_window_destroy(window);
+    TEST_PASS();
+}
+
+void test_summarize_compression_falls_back_to_eviction(void) {
+    TEST_START("Summarize compression fallback eviction");
+
+    ContextConfig config = context_config_default();
+    config.max_tokens = 45;
+    config.compression = COMPRESSION_SUMMARIZE;
+    config.auto_compress = true;
+
+    ContextWindow* window = context_window_create_with_config(&config);
+    ASSERT(window != NULL, "Window should be created");
+
+    ASSERT(context_window_add_message(window, MESSAGE_USER, PRIORITY_NORMAL,
+                                      "A somewhat long context line for eviction test one."),
+           "Should add message 1");
+    ASSERT(context_window_add_message(window, MESSAGE_ASSISTANT, PRIORITY_NORMAL,
+                                      "Another somewhat long context line for eviction test two."),
+           "Should add message 2");
+
+    ASSERT(context_window_add_message(window, MESSAGE_USER, PRIORITY_NORMAL,
+                                      "This new input should force compression and maybe eviction."),
+           "Should add message 3");
+
+    ASSERT(context_window_get_token_count(window) <= config.max_tokens,
+           "Token count should remain bounded after fallback");
+    ASSERT(context_window_get_message_count(window) > 0,
+           "Window should still contain messages");
+
+    context_window_destroy(window);
+    TEST_PASS();
+}
+
 void test_all_message_types(void) {
     TEST_START("All message types");
     
@@ -632,6 +713,8 @@ int main(void) {
     test_all_priorities_preserved();
     test_forced_eviction();
     test_sliding_window_behavior();
+    test_summarize_compression_creates_summary();
+    test_summarize_compression_falls_back_to_eviction();
     
     printf("\n--- Message Type Tests ---\n");
     test_all_message_types();
