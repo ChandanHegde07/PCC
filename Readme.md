@@ -5,7 +5,7 @@
 ![Language: C](https://img.shields.io/badge/Language-C-555555?style=flat&logo=c)
 ![Platform: POSIX](https://img.shields.io/badge/Platform-POSIX-2ca02c?style=flat)
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen?style=flat)](https://github.com/ChandanHegde07/PCC/actions)
-![Test Coverage](https://img.shields.io/badge/Tests-23%20passed-4c1?style=flat)
+![Test Coverage](https://img.shields.io/badge/Tests-25%20passed-4c1?style=flat)
 ![Last Updated](https://img.shields.io/badge/Last_Updated-Mar_2026-eeb901?style=flat)
 
 A lightweight, efficient C library for managing conversation history within the context window constraints of Small Language Models (SLMs).
@@ -39,9 +39,10 @@ PCC implements intelligent context window management using proven data structure
 - Pure C with minimal dependencies — small binary, fast startup
 - O(1) amortized message insertion with efficient memory management
 - Priority-based retention keeps system prompts and critical messages safe
+- Optional summarization compression (`COMPRESSION_SUMMARIZE`) for older context
 - Approximate token counting without heavy NLP libraries
 - Simple API that drops into existing projects with minimal friction
-- 23+ test cases, CI/CD pipeline, and Doxygen-generated docs
+- 25+ test cases, CI/CD pipeline, and Doxygen-generated docs
 
 ---
 
@@ -222,7 +223,7 @@ int main(void) {
     ContextConfig config = context_config_default();
 
     config.max_tokens    = 2000;
-    config.compression   = COMPRESSION_LOW_PRIORITY;
+    config.compression   = COMPRESSION_SUMMARIZE;
     config.enable_metrics = true;
     config.auto_compress = true;
 
@@ -278,12 +279,12 @@ Per-message overhead is ~100–200 bytes plus content length.
 ## Testing
 
 ```bash
-make test       # Run the full test suite (23+ cases)
+make test       # Run the full test suite (25+ cases)
 make memtest    # Valgrind memory leak check
 make asan       # AddressSanitizer build
 ```
 
-Test coverage includes basic operations, NULL and boundary inputs, priority-based eviction, token calculation, memory stress, save/load roundtrips, and configuration validation.
+Test coverage includes basic operations, NULL and boundary inputs, priority-based eviction, summarize compression with fallback behavior, token calculation, memory stress, save/load roundtrips, and configuration validation.
 
 ---
 
@@ -324,7 +325,7 @@ PCC/
 │   └── design.md                  # Design decisions
 ├── Doxyfile                       # Doxygen configuration
 ├── Makefile
-└── README.md
+└── Readme.md
 ```
 
 ---
