@@ -483,6 +483,97 @@ void test_message_type_string_format(void) {
     TEST_PASS();
 }
 
+void test_get_messages_by_type(void) {
+    TEST_START("Get messages by type");
+
+    ContextWindow* window = context_window_create(1000);
+    ASSERT(window != NULL, "Window should be created");
+
+    ASSERT(context_window_add_message(window, MESSAGE_USER, PRIORITY_NORMAL, "User one"),
+           "Should add first user message");
+    ASSERT(context_window_add_message(window, MESSAGE_ASSISTANT, PRIORITY_NORMAL, "Assistant one"),
+           "Should add assistant message");
+    ASSERT(context_window_add_message(window, MESSAGE_USER, PRIORITY_HIGH, "User two"),
+           "Should add second user message");
+
+    char** user_messages = NULL;
+    int count = context_window_get_messages_by_type(window, MESSAGE_USER, &user_messages);
+    ASSERT(count == 2, "Should return only USER messages");
+    ASSERT(user_messages != NULL, "Returned array should not be NULL");
+    ASSERT(strcmp(user_messages[0], "User one") == 0, "Should preserve message order for first user message");
+    ASSERT(strcmp(user_messages[1], "User two") == 0, "Should preserve message order for second user message");
+
+    context_window_free_message_array(user_messages, count);
+
+    char** tool_messages = (char**)0x1;
+    count = context_window_get_messages_by_type(window, MESSAGE_TOOL, &tool_messages);
+    ASSERT(count == 0, "Should return 0 when no messages match type");
+    ASSERT(tool_messages == NULL, "Output pointer should be set to NULL when no matches exist");
+
+    context_window_destroy(window);
+    TEST_PASS();
+}
+
+void test_get_messages_by_priority(void) {
+    TEST_START("Get messages by priority");
+
+    ContextWindow* window = context_window_create(1000);
+    ASSERT(window != NULL, "Window should be created");
+
+    ASSERT(context_window_add_message(window, MESSAGE_SYSTEM, PRIORITY_CRITICAL, "Critical one"),
+           "Should add first critical message");
+    ASSERT(context_window_add_message(window, MESSAGE_USER, PRIORITY_NORMAL, "Normal one"),
+           "Should add normal message");
+    ASSERT(context_window_add_message(window, MESSAGE_ASSISTANT, PRIORITY_CRITICAL, "Critical two"),
+           "Should add second critical message");
+
+    char** critical_messages = NULL;
+    int count = context_window_get_messages_by_priority(window, PRIORITY_CRITICAL, &critical_messages);
+    ASSERT(count == 2, "Should return only CRITICAL messages");
+    ASSERT(critical_messages != NULL, "Returned array should not be NULL");
+    ASSERT(strcmp(critical_messages[0], "Critical one") == 0,
+           "Should preserve order for first critical message");
+    ASSERT(strcmp(critical_messages[1], "Critical two") == 0,
+           "Should preserve order for second critical message");
+
+    context_window_free_message_array(critical_messages, count);
+
+    char** low_messages = (char**)0x1;
+    count = context_window_get_messages_by_priority(window, PRIORITY_LOW, &low_messages);
+    ASSERT(count == 0, "Should return 0 when no messages match priority");
+    ASSERT(low_messages == NULL, "Output pointer should be set to NULL when no matches exist");
+
+    context_window_destroy(window);
+    TEST_PASS();
+}
+
+void test_get_messages_filter_invalid_params(void) {
+    TEST_START("Message filtering invalid params");
+
+    ContextWindow* window = context_window_create(1000);
+    ASSERT(window != NULL, "Window should be created");
+    ASSERT(context_window_add_message(window, MESSAGE_USER, PRIORITY_NORMAL, "User message"),
+           "Should add message");
+
+    char** messages = NULL;
+    int count = context_window_get_messages_by_type(NULL, MESSAGE_USER, &messages);
+    ASSERT(count == 0, "NULL window should return 0 for type filter");
+
+    count = context_window_get_messages_by_type(window, MESSAGE_USER, NULL);
+    ASSERT(count == 0, "NULL output pointer should return 0 for type filter");
+
+    count = context_window_get_messages_by_priority(NULL, PRIORITY_NORMAL, &messages);
+    ASSERT(count == 0, "NULL window should return 0 for priority filter");
+
+    count = context_window_get_messages_by_priority(window, PRIORITY_NORMAL, NULL);
+    ASSERT(count == 0, "NULL output pointer should return 0 for priority filter");
+
+    context_window_free_message_array(NULL, 1);
+
+    context_window_destroy(window);
+    TEST_PASS();
+}
+
 void test_repeated_create_destroy(void) {
     TEST_START("Repeated create/destroy");
     
@@ -719,6 +810,9 @@ int main(void) {
     printf("\n--- Message Type Tests ---\n");
     test_all_message_types();
     test_message_type_string_format();
+    test_get_messages_by_type();
+    test_get_messages_by_priority();
+    test_get_messages_filter_invalid_params();
     
     printf("\n--- Memory and Stress Tests ---\n");
     test_repeated_create_destroy();

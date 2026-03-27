@@ -42,7 +42,7 @@ PCC implements intelligent context window management using proven data structure
 - Optional summarization compression (`COMPRESSION_SUMMARIZE`) for older context
 - Approximate token counting without heavy NLP libraries
 - Simple API that drops into existing projects with minimal friction
-- 25+ test cases, CI/CD pipeline, and Doxygen-generated docs
+- 28+ test cases, CI/CD pipeline, and Doxygen-generated docs
 
 ---
 
@@ -164,6 +164,9 @@ void process_user_query(ContextWindow* window, const char* user_input) {
 | `context_window_get_message_count(...)` | Number of messages in window | `int` |
 | `context_window_get_token_count(...)` | Current token count | `int` |
 | `context_window_get_utilization(...)` | Utilization as a percentage | `double` |
+| `context_window_get_messages_by_type(...)` | Filter messages by role/type | `int` |
+| `context_window_get_messages_by_priority(...)` | Filter messages by priority | `int` |
+| `context_window_free_message_array(...)` | Free arrays returned by filter APIs | `void` |
 | `context_window_print_stats(ContextWindow*)` | Print window statistics | `void` |
 | `context_window_print_metrics(ContextWindow*)` | Print detailed metrics | `void` |
 | `calculate_token_count(const char*)` | Estimate tokens in a string | `int` |
@@ -279,12 +282,12 @@ Per-message overhead is ~100–200 bytes plus content length.
 ## Testing
 
 ```bash
-make test       # Run the full test suite (25+ cases)
+make test       # Run the full test suite (28+ cases)
 make memtest    # Valgrind memory leak check
 make asan       # AddressSanitizer build
 ```
 
-Test coverage includes basic operations, NULL and boundary inputs, priority-based eviction, summarize compression with fallback behavior, token calculation, memory stress, save/load roundtrips, and configuration validation.
+Test coverage includes basic operations, NULL and boundary inputs, priority-based eviction, summarize compression with fallback behavior, token calculation, message filtering by type/priority, memory stress, save/load roundtrips, and configuration validation.
 
 ---
 
